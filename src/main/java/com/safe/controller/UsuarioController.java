@@ -60,8 +60,17 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public Object login(@RequestBody LoginDTO data) {
-        return service.login(data.getEmail(), data.getPassword());
+    public ResponseEntity<?> login(@RequestBody LoginDTO data) {
+        String token = service.login(data.getEmail(), data.getPassword());
+
+        if (token == null) {
+            return new ResponseEntity<>(Map.of(
+                    "status", "error",
+                    "message", "Credenciales invalidas"
+            ), HttpStatus.UNAUTHORIZED);
+        }
+
+        return ResponseEntity.ok(token);
     }
 
     @PostMapping("/logout")

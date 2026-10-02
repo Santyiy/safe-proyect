@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:8080` : "http://localhost:8080");
 const TOKEN_KEY = "safe.token";
 
 export type Usuario = {
@@ -145,8 +147,9 @@ export function normalizeRole(rol?: string) {
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
+  const isPublicAuthPath = path === "/usuario/login" || path === "/usuario/register";
 
-  if (token) {
+  if (token && !isPublicAuthPath) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 

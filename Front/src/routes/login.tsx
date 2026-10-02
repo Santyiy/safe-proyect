@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
 import { Reveal } from "@/components/safe/reveal";
-import { normalizeRole, safeApi, setToken } from "@/lib/api";
+import { clearToken, normalizeRole, safeApi, setToken } from "@/lib/api";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -33,6 +33,7 @@ function Login() {
     event.preventDefault();
     setError("");
     setLoading(true);
+    clearToken();
 
     try {
       const token = await safeApi.login(email, password);

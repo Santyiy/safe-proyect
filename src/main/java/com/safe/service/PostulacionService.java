@@ -1,5 +1,6 @@
 package com.safe.service;
 
+import com.safe.dto.AnalisisCvResultadoDTO;
 import com.safe.model.PostulacionId;
 import com.safe.model.PostulacionModel;
 import com.safe.model.PostulanteModel;
@@ -26,15 +27,18 @@ public class PostulacionService {
     private final RestTemplate restTemplate;
 
     private final String n8nWebhookUrl;
+    private final String publicBaseUrl;
 
     public PostulacionService(PostulacionRepository postulacionRepository, 
                               PostulanteService postulanteService, 
                               PuestoService puestoService,
-                              @Value("${n8n.webhook.analisis-cv-url:}") String n8nWebhookUrl) {
+                              @Value("${n8n.webhook.analisis-cv-url:}") String n8nWebhookUrl,
+                              @Value("${safe.api.public-base-url:http://localhost:8080}") String publicBaseUrl) {
         this.postulacionRepository = postulacionRepository;
         this.postulanteService = postulanteService;
         this.puestoService = puestoService;
         this.n8nWebhookUrl = n8nWebhookUrl;
+        this.publicBaseUrl = publicBaseUrl;
         this.restTemplate = new RestTemplate(); // Cliente HTTP para llamar a n8n
     }
 
@@ -73,6 +77,26 @@ public class PostulacionService {
         return postulacionRepository.findByPostulanteId(postulante.getId());
     }
 
+    public PostulacionModel actualizarResultadoAnalisisCv(AnalisisCvResultadoDTO dto) {
+        if (dto.getIdPostulante() == null || dto.getIdPuesto() == null) {
+            throw new IllegalArgumentException("idPostulante e idPuesto son obligatorios");
+        }
+
+        PostulacionId id = new PostulacionId(dto.getIdPostulante(), dto.getIdPuesto());
+        PostulacionModel postulacion = postulacionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Postulacion no encontrada"));
+
+        postulacion.setScoreIa(dto.getScoreIa());
+        postulacion.setObservacionesIa(dto.getObservacionesIa());
+        postulacion.setEstado(
+                dto.getEstado() == null || dto.getEstado().isBlank()
+                        ? "ANALIZADO_IA"
+                        : dto.getEstado()
+        );
+
+        return postulacionRepository.save(postulacion);
+    }
+
     private void enviarDatosAn8n(PostulanteModel postulante, PuestoModel puesto) {
         try {
             if (n8nWebhookUrl == null || n8nWebhookUrl.trim().isEmpty()) {
@@ -85,6 +109,8 @@ public class PostulacionService {
 
             // Construir el payload con los datos necesarios para la IA
             Map<String, Object> payload = new HashMap<>();
+            payload.put("evento", "ANALISIS_CV");
+            payload.put("callbackUrl", publicBaseUrl + "/webhooks/n8n/analisis-cv");
             
             // Datos del Puesto
             Map<String, Object> datosPuesto = new HashMap<>();
@@ -96,9 +122,16 @@ public class PostulacionService {
             // Datos del Postulante
             Map<String, Object> datosPostulante = new HashMap<>();
             datosPostulante.put("id", postulante.getId());
+            if (postulante.getUsuario() != null) {
+                datosPostulante.put("nombre", postulante.getUsuario().getNombre());
+                datosPostulante.put("email", postulante.getUsuario().getEmail());
+                datosPostulante.put("dni", postulante.getUsuario().getDni());
+            }
             datosPostulante.put("experiencia", postulante.getExperienciaLaboral());
             datosPostulante.put("estudios", postulante.getEstudios());
             datosPostulante.put("cvUrl", postulante.getCvUrl());
+            datosPostulante.put("telefono", postulante.getTelefono());
+            datosPostulante.put("direccion", postulante.getDireccion());
             payload.put("postulante", datosPostulante);
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);

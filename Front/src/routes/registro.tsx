@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Check, ShieldCheck } from "lucide-react";
 import { Reveal } from "@/components/safe/reveal";
-import { safeApi, setToken } from "@/lib/api";
+import { clearToken, safeApi, setToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/registro")({
@@ -32,6 +32,7 @@ function Registro() {
       return;
     }
     setLoading(true);
+    clearToken();
     try {
       await safeApi.register({
         dni: form.dni,
@@ -40,6 +41,9 @@ function Registro() {
         password: form.password,
       });
       const token = await safeApi.login(form.email, form.password);
+      if (!token) {
+        throw new Error("Usuario creado, pero no se pudo iniciar sesion automaticamente");
+      }
       setToken(token);
       await safeApi.crearPerfil({
         telefono: form.telefono,
